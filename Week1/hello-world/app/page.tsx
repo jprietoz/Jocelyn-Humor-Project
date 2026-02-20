@@ -111,7 +111,7 @@ export default function Home() {
         const { data: votes, error: votesError } = await supabase
           .from('caption_votes')
           .select('*')
-          .eq('profile_id', user.id)
+          .eq('profile_id', user!.id)
 
         if (votesError) {
           console.error('Votes error:', votesError)
@@ -210,22 +210,15 @@ export default function Home() {
         newCounts.set(captionId, currentCount - currentVote + voteValue)
         setVoteCounts(newCounts)
 
-      }
-        else {
+      } else {
         // User is voting for the first time
-        console.log('Attempting to insert vote:', {
-            caption_id: captionId,
-            profile_id: user.id,
-            vote_value: voteValue
-        })
-
         const { error } = await supabase
           .from('caption_votes')
           .insert({
-              caption_id: captionId,
-              profile_id: user.id,
-              vote_value: voteValue,
-              created_datetime_utc: new Date().toISOString()
+            caption_id: captionId,
+            profile_id: user.id,
+            vote_value: voteValue,
+            created_datetime_utc: new Date().toISOString()
           })
 
         if (error) {
@@ -246,14 +239,10 @@ export default function Home() {
         setVoteCounts(newCounts)
       }
     } catch (err) {
-        console.error('Unexpected error voting:', err)
-        console.error('Error type:', typeof err)
-        console.error('Error stringified:', JSON.stringify(err, null, 2))
-        if (err instanceof Error) {
-          console.error('Error message:', err.message)
-          console.error('Error stack:', err.stack)
-        }
-        alert(`An unexpected error occurred: ${err instanceof Error ? err.message : JSON.stringify(err)}`)
+      console.error('Unexpected error voting:', err)
+      if (err instanceof Error) {
+        alert(`An unexpected error occurred: ${err.message}`)
+      }
     }
   }
 
