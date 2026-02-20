@@ -42,7 +42,7 @@
              The Humor Project<sup className="text-2xl">™</sup>
            </h1>
            <p className="text-gray-300 text-lg">
-             Sign in to see how well AI can crack you... up.
+             Sign in and let AI crack you... up.
            </p>
          </div>
 

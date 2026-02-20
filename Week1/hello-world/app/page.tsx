@@ -23,6 +23,13 @@ interface Caption {
   created_at_utc?: string
 }
 
+interface CaptionVote {
+  id: string
+  caption_id: string
+  profile_id: string
+  vote_value: number
+}
+
 interface ImageWithCaptions extends Image {
   captions: Caption[]
 }
@@ -33,8 +40,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null)
   const [darkMode, setDarkMode] = useState(true)
   const [selectedImage, setSelectedImage] = useState<ImageWithCaptions | null>(null)
-  const [likedCaptions, setLikedCaptions] = useState<Set<string>>(new Set())
   const [user, setUser] = useState<User | null>(null)
+  const [userVotes, setUserVotes] = useState<Map<string, number>>(new Map())
+  const [voteCounts, setVoteCounts] = useState<Map<string, number>>(new Map())
   const router = useRouter()
   const supabase = createClient()
 
@@ -65,26 +73,58 @@ export default function Home() {
           .select('*')
           .limit(20)
 
-        console.log('Images response:', { images, imagesError })
-
         if (imagesError) {
           console.error('Images error details:', imagesError)
           throw imagesError
         }
-
-        console.log('Starting to fetch captions...')
 
         // Fetch captions
         const { data: captions, error: captionsError } = await supabase
           .from('captions')
           .select('*')
 
-        console.log('Captions response:', { captions, captionsError })
-
         if (captionsError) {
           console.error('Captions error details:', captionsError)
           throw captionsError
         }
+
+        // Fetch all votes to calculate vote counts
+        const { data: allVotes, error: allVotesError } = await supabase
+          .from('caption_votes')
+          .select('*')
+
+        if (allVotesError) {
+          console.error('All votes error:', allVotesError)
+        }
+
+        // Calculate vote counts per caption
+        const counts = new Map<string, number>()
+        if (allVotes) {
+          allVotes.forEach((vote: CaptionVote) => {
+            const current = counts.get(vote.caption_id) || 0
+            counts.set(vote.caption_id, current + vote.vote_value)
+          })
+        }
+        setVoteCounts(counts)
+
+        // Fetch user's votes
+        const { data: votes, error: votesError } = await supabase
+          .from('caption_votes')
+          .select('*')
+          .eq('profile_id', user.id)
+
+        if (votesError) {
+          console.error('Votes error:', votesError)
+        }
+
+        // Store user's votes in a map for quick lookup
+        const votesMap = new Map<string, number>()
+        if (votes) {
+          votes.forEach((vote: CaptionVote) => {
+            votesMap.set(vote.caption_id, vote.vote_value)
+          })
+        }
+        setUserVotes(votesMap)
 
         // Combine images with their captions
         const combined = (images || []).map(image => ({
@@ -95,11 +135,9 @@ export default function Home() {
         // Sort by number of captions (most captions first)
         const sorted = combined.sort((a, b) => b.captions.length - a.captions.length)
 
-        console.log('Combined data:', sorted)
         setImagesWithCaptions(sorted)
       } catch (err) {
         console.error('Full error object:', err)
-        console.error('Error details:', JSON.stringify(err, null, 2))
         setError(err instanceof Error ? err.message : 'An error occurred')
       } finally {
         setLoading(false)
@@ -113,20 +151,118 @@ export default function Home() {
     return caption.text || caption.caption_text || caption.content || 'No text'
   }
 
-  const toggleLike = (captionId: string) => {
-    setLikedCaptions(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(captionId)) {
-        newSet.delete(captionId)
-      } else {
-        newSet.add(captionId)
+  const handleVote = async (captionId: string, voteValue: number) => {
+    if (!user) {
+      alert('You must be logged in to vote')
+      return
+    }
+
+    try {
+      const currentVote = userVotes.get(captionId)
+
+      // If user is clicking the same vote, remove it
+      if (currentVote === voteValue) {
+        const { error } = await supabase
+          .from('caption_votes')
+          .delete()
+          .eq('caption_id', captionId)
+          .eq('profile_id', user.id)
+
+        if (error) {
+          console.error('Error removing vote:', error)
+          alert('Failed to remove vote. Please try again.')
+          return
+        }
+
+        // Update local state
+        const newVotes = new Map(userVotes)
+        newVotes.delete(captionId)
+        setUserVotes(newVotes)
+
+        // Update vote count
+        const newCounts = new Map(voteCounts)
+        const currentCount = newCounts.get(captionId) || 0
+        newCounts.set(captionId, currentCount - voteValue)
+        setVoteCounts(newCounts)
+
+      } else if (currentVote !== undefined) {
+        // User is changing their vote
+        const { error } = await supabase
+          .from('caption_votes')
+          .update({ vote_value: voteValue })
+          .eq('caption_id', captionId)
+          .eq('profile_id', user.id)
+
+        if (error) {
+          console.error('Error updating vote:', error)
+          alert('Failed to update vote. Please try again.')
+          return
+        }
+
+        // Update local state
+        const newVotes = new Map(userVotes)
+        newVotes.set(captionId, voteValue)
+        setUserVotes(newVotes)
+
+        // Update vote count
+        const newCounts = new Map(voteCounts)
+        const currentCount = newCounts.get(captionId) || 0
+        newCounts.set(captionId, currentCount - currentVote + voteValue)
+        setVoteCounts(newCounts)
+
       }
-      return newSet
-    })
+        else {
+        // User is voting for the first time
+        console.log('Attempting to insert vote:', {
+            caption_id: captionId,
+            profile_id: user.id,
+            vote_value: voteValue
+        })
+
+        const { error } = await supabase
+          .from('caption_votes')
+          .insert({
+              caption_id: captionId,
+              profile_id: user.id,
+              vote_value: voteValue,
+              created_datetime_utc: new Date().toISOString()
+          })
+
+        if (error) {
+          console.error('Error inserting vote:', error)
+          alert(`Failed to submit vote: ${error.message || 'Unknown error'}`)
+          return
+        }
+
+        // Update local state
+        const newVotes = new Map(userVotes)
+        newVotes.set(captionId, voteValue)
+        setUserVotes(newVotes)
+
+        // Update vote count
+        const newCounts = new Map(voteCounts)
+        const currentCount = newCounts.get(captionId) || 0
+        newCounts.set(captionId, currentCount + voteValue)
+        setVoteCounts(newCounts)
+      }
+    } catch (err) {
+        console.error('Unexpected error voting:', err)
+        console.error('Error type:', typeof err)
+        console.error('Error stringified:', JSON.stringify(err, null, 2))
+        if (err instanceof Error) {
+          console.error('Error message:', err.message)
+          console.error('Error stack:', err.stack)
+        }
+        alert(`An unexpected error occurred: ${err instanceof Error ? err.message : JSON.stringify(err)}`)
+    }
   }
 
-  const isLiked = (captionId: string) => {
-    return likedCaptions.has(captionId)
+  const getUserVote = (captionId: string): number | undefined => {
+    return userVotes.get(captionId)
+  }
+
+  const getVoteCount = (captionId: string): number => {
+    return voteCounts.get(captionId) || 0
   }
 
   const handleLogout = async () => {
@@ -146,6 +282,77 @@ export default function Home() {
     return (
       <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="text-xl text-red-600">Error: {error}</div>
+      </div>
+    )
+  }
+
+  const CaptionCard = ({ caption, compact = false }: { caption: Caption; compact?: boolean }) => {
+    const userVote = getUserVote(caption.id)
+    const voteCount = getVoteCount(caption.id)
+
+    return (
+      <div
+        className={`p-3 rounded-lg ${
+          darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50 text-gray-700'
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          {/* Vote buttons */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleVote(caption.id, 1)
+              }}
+              className={`transition-colors ${
+                userVote === 1
+                  ? 'text-orange-500'
+                  : darkMode
+                  ? 'text-gray-400 hover:text-orange-400'
+                  : 'text-gray-500 hover:text-orange-500'
+              }`}
+              title="Upvote"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" />
+              </svg>
+            </button>
+            <span className={`text-sm font-semibold ${
+              voteCount > 0
+                ? 'text-orange-500'
+                : voteCount < 0
+                ? 'text-blue-500'
+                : darkMode
+                ? 'text-gray-400'
+                : 'text-gray-600'
+            }`}>
+              {voteCount}
+            </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleVote(caption.id, -1)
+              }}
+              className={`transition-colors ${
+                userVote === -1
+                  ? 'text-blue-500'
+                  : darkMode
+                  ? 'text-gray-400 hover:text-blue-400'
+                  : 'text-gray-500 hover:text-blue-500'
+              }`}
+              title="Downvote"
+            >
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Caption text */}
+          <div className="flex-1">
+            <p className={compact ? 'text-sm' : 'text-base'}>{getCaptionText(caption)}</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -237,37 +444,13 @@ export default function Home() {
 
               {/* Caption Preview */}
               <div className="p-4">
-                <h3 className={`text-sm font-semibold mb-2 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                   Captions ({image.captions.length})
                 </h3>
                 {image.captions.length > 0 ? (
                   <div className="space-y-2">
                     {image.captions.slice(0, 2).map((caption) => (
-                      <div
-                        key={caption.id}
-                        className={`text-sm p-2 rounded flex items-start justify-between gap-2 ${
-                          darkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-50 text-gray-600'
-                        }`}
-                      >
-                        <span className="flex-1">{getCaptionText(caption)}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleLike(caption.id)
-                          }}
-                          className="flex-shrink-0 transition-transform hover:scale-110"
-                        >
-                          {isLiked(caption.id) ? (
-                            <svg className="w-5 h-5 text-red-500 fill-current" viewBox="0 0 20 20">
-                              <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
-                            </svg>
-                          ) : (
-                            <svg className="w-5 h-5 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
+                      <CaptionCard key={caption.id} caption={caption} compact />
                     ))}
                     {image.captions.length > 2 && (
                       <div
@@ -352,39 +535,8 @@ export default function Home() {
                 {/* Scrollable Captions List */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-3">
                   {selectedImage.captions.length > 0 ? (
-                    selectedImage.captions.map((caption, index) => (
-                      <div
-                        key={caption.id}
-                        className={`p-3 rounded-lg ${
-                          darkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-50 text-gray-700'
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className={`text-xs font-semibold ${
-                            darkMode ? 'text-gray-400' : 'text-gray-500'
-                          }`}>
-                            Caption #{index + 1}
-                          </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              toggleLike(caption.id)
-                            }}
-                            className="transition-transform hover:scale-110"
-                          >
-                            {isLiked(caption.id) ? (
-                              <svg className="w-6 h-6 text-red-500 fill-current" viewBox="0 0 20 20">
-                                <path d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-6 h-6 text-gray-400 hover:text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                        <p className="text-sm">{getCaptionText(caption)}</p>
-                      </div>
+                    selectedImage.captions.map((caption) => (
+                      <CaptionCard key={caption.id} caption={caption} />
                     ))
                   ) : (
                     <div className={`text-center py-8 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
