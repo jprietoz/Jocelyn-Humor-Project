@@ -257,7 +257,7 @@ export default function Home() {
 
       } else if (currentVote !== undefined) {
         const { error } = await supabase
-          .from('caption_votes').update({ vote_value: voteValue })
+          .from('caption_votes').update({ vote_value: voteValue, modified_by_user_id: user.id })
           .eq('caption_id', captionId).eq('profile_id', user.id)
         if (error) { console.error('Error updating vote:', error); alert('Failed to update vote.'); return }
         const newVotes = new Map(userVotes); newVotes.set(captionId, voteValue); setUserVotes(newVotes)
@@ -267,7 +267,7 @@ export default function Home() {
         const { error } = await supabase
           .from('caption_votes').insert({
             caption_id: captionId, profile_id: user.id, vote_value: voteValue,
-            created_datetime_utc: new Date().toISOString()
+            created_by_user_id: user.id, modified_by_user_id: user.id,
           })
         if (error) { console.error('Error inserting vote:', error); alert(`Failed to submit vote: ${error.message}`); return }
         const newVotes = new Map(userVotes); newVotes.set(captionId, voteValue); setUserVotes(newVotes)
