@@ -41,6 +41,8 @@ export default function VotePage() {
     fetchItems()
   }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const storageKey = user ? `vote_progress_${user.id}` : null
+
   const fetchItems = async () => {
     setLoading(true)
     try {
@@ -91,6 +93,24 @@ export default function VotePage() {
         }
       }
 
+      // Restore saved progress
+      if (storageKey) {
+        try {
+          const saved = localStorage.getItem(storageKey)
+          if (saved) {
+            const { index, liked } = JSON.parse(saved)
+            if (typeof index === 'number' && index > 0 && index < flat.length) {
+              setCurrentIndex(index)
+            }
+            if (typeof liked === 'number') {
+              setLikedCount(liked)
+            }
+          }
+        } catch {
+          // ignore malformed data
+        }
+      }
+
       setItems(flat)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load memes')
@@ -125,6 +145,12 @@ export default function VotePage() {
       setSwipeDir(null)
     }, 280)
   }, [current, user, supabase, swipeDir])
+
+  // Persist progress to localStorage
+  useEffect(() => {
+    if (!storageKey || loading) return
+    localStorage.setItem(storageKey, JSON.stringify({ index: currentIndex, liked: likedCount }))
+  }, [currentIndex, likedCount, storageKey, loading])
 
   // Keyboard arrow support
   useEffect(() => {
@@ -215,7 +241,11 @@ export default function VotePage() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => { setCurrentIndex(0); setLikedCount(0) }}
+                onClick={() => {
+                  if (storageKey) localStorage.removeItem(storageKey)
+                  setCurrentIndex(0)
+                  setLikedCount(0)
+                }}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
               >
                 Start Over
