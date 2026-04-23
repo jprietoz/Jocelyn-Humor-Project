@@ -86,6 +86,8 @@ export default function Home() {
   const [userVotes, setUserVotes] = useState<Map<string, number>>(new Map())
   const [voteCounts, setVoteCounts] = useState<Map<string, number>>(new Map())
   const [brokenImageIds, setBrokenImageIds] = useState<Set<string>>(new Set())
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [showHowTo, setShowHowTo] = useState(true)
 
   // Upload state
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -305,9 +307,12 @@ export default function Home() {
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
     const file = e.dataTransfer.files?.[0]
     if (!file) return
-    if (!SUPPORTED_TYPES.includes(file.type)) {
+    const normalizedType = normalizeContentType(file)
+    if (!SUPPORTED_TYPES.includes(normalizedType) && !SUPPORTED_TYPES.includes(file.type)) {
       setUploadError('Unsupported file type. Please use JPEG, PNG, WEBP, GIF, or HEIC.')
       return
     }
@@ -363,12 +368,17 @@ export default function Home() {
     }
   }
 
-  const resetUploadModal = () => {
+  const resetUploadModal = (force = false) => {
+    const isProcessing = uploadStep === 'uploading' || uploadStep === 'registering' || uploadStep === 'generating'
+    if (isProcessing && !force) {
+      if (!window.confirm('Upload is still in progress. Are you sure you want to cancel?')) return
+    }
     setShowUploadModal(false)
     setSelectedFile(null)
     setPreviewUrl(null)
     setUploadStep('idle')
     setUploadError(null)
+    setIsDragOver(false)
     setNewCaptions([])
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
@@ -410,28 +420,38 @@ export default function Home() {
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={(e) => { e.stopPropagation(); handleVote(caption.id, 1) }}
-              className={`transition-colors ${userVote === 1 ? 'text-orange-500' : darkMode ? 'text-gray-400 hover:text-orange-400' : 'text-gray-500 hover:text-orange-500'}`}
-              title="Upvote"
+              className={`relative transition-colors group ${userVote === 1 ? 'text-orange-500' : darkMode ? 'text-gray-400 hover:text-orange-400' : 'text-gray-500 hover:text-orange-500'}`}
+              title={userVote === 1 ? 'Click to remove upvote' : 'Upvote'}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" />
               </svg>
+              {userVote === 1 && (
+                <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] whitespace-nowrap bg-gray-800 text-gray-200 rounded px-1 py-0.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  Click to undo
+                </span>
+              )}
             </button>
             <span className={`text-sm font-semibold ${voteCount > 0 ? 'text-orange-500' : voteCount < 0 ? 'text-blue-500' : darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               {voteCount}
             </span>
             <button
               onClick={(e) => { e.stopPropagation(); handleVote(caption.id, -1) }}
-              className={`transition-colors ${userVote === -1 ? 'text-blue-500' : darkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-500'}`}
-              title="Downvote"
+              className={`relative transition-colors group ${userVote === -1 ? 'text-blue-500' : darkMode ? 'text-gray-400 hover:text-blue-400' : 'text-gray-500 hover:text-blue-500'}`}
+              title={userVote === -1 ? 'Click to remove downvote' : 'Downvote'}
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" />
               </svg>
+              {userVote === -1 && (
+                <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[9px] whitespace-nowrap bg-gray-800 text-gray-200 rounded px-1 py-0.5 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  Click to undo
+                </span>
+              )}
             </button>
           </div>
           <div className="flex-1">
-            <p className={compact ? 'text-sm' : 'text-base'}>{getCaptionText(caption)}</p>
+            <p className={compact ? 'text-sm leading-snug' : 'text-base'}>{getCaptionText(caption)}</p>
           </div>
         </div>
       </div>
@@ -458,12 +478,22 @@ export default function Home() {
           {/* Nav Tabs */}
           <div className={`flex gap-1 rounded-xl p-1 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
             <span className={`px-5 py-2 rounded-lg text-sm font-semibold ${darkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-900 shadow'}`}>
-              Meme Gallery
+              Gallery
             </span>
+            <Link href="/trending" className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}>
+              Trending
+            </Link>
             <Link href="/vote" className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
               darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
             }`}>
               Vote
+            </Link>
+            <Link href="/profile" className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}>
+              Profile
             </Link>
           </div>
 
@@ -522,6 +552,31 @@ export default function Home() {
           </div>
         </div>
 
+        {/* How-to Banner */}
+        {showHowTo && (
+          <div className={`mb-6 rounded-xl p-4 flex items-start gap-4 ${darkMode ? 'bg-purple-900/40 border border-purple-700/50' : 'bg-purple-50 border border-purple-200'}`}>
+            <span className="text-2xl shrink-0">💡</span>
+            <div className="flex-1">
+              <p className={`font-semibold mb-1 ${darkMode ? 'text-purple-300' : 'text-purple-800'}`}>How it works</p>
+              <ul className={`text-sm space-y-0.5 ${darkMode ? 'text-purple-200' : 'text-purple-700'}`}>
+                <li>• Browse memes below — each one has AI-generated captions you can vote on</li>
+                <li>• Click a meme to see all its captions and vote on each one</li>
+                <li>• Head to <strong>Vote</strong> for a swipe-style experience — use <kbd className={`px-1 py-0.5 rounded text-xs font-mono border ${darkMode ? 'border-purple-500 bg-purple-800' : 'border-purple-300 bg-white'}`}>←</kbd> / <kbd className={`px-1 py-0.5 rounded text-xs font-mono border ${darkMode ? 'border-purple-500 bg-purple-800' : 'border-purple-300 bg-white'}`}>→</kbd> arrow keys to vote faster</li>
+                <li>• Upload your own meme using the <strong>Upload</strong> button — AI will generate captions for it!</li>
+              </ul>
+            </div>
+            <button
+              onClick={() => setShowHowTo(false)}
+              className={`shrink-0 p-1 rounded-full transition-colors ${darkMode ? 'text-purple-400 hover:text-purple-200 hover:bg-purple-800' : 'text-purple-400 hover:text-purple-700 hover:bg-purple-100'}`}
+              title="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* Image Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {imagesWithCaptions.filter(img => !brokenImageIds.has(img.id)).map((image) => (
@@ -542,7 +597,7 @@ export default function Home() {
               </div>
 
               <div className="p-4">
-                <h3 className={`text-sm font-semibold mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                <h3 className={`text-base font-semibold mb-3 ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
                   Captions ({image.captions.length})
                 </h3>
                 {image.captions.length > 0 ? (
@@ -551,12 +606,12 @@ export default function Home() {
                       <CaptionCard key={caption.id} caption={caption} compact />
                     ))}
                     {image.captions.length > 3 && (
-                      <div
-                        className={`text-xs italic cursor-pointer hover:underline ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}
+                      <button
+                        className={`w-full mt-1 text-sm font-medium py-1.5 rounded-lg transition-colors cursor-pointer ${darkMode ? 'text-purple-400 hover:bg-gray-700' : 'text-purple-600 hover:bg-purple-50'}`}
                         onClick={() => setSelectedImage(image)}
                       >
-                        Click image to see all {image.captions.length} captions
-                      </div>
+                        View all {image.captions.length} captions →
+                      </button>
                     )}
                   </div>
                 ) : (
@@ -655,7 +710,7 @@ export default function Home() {
       {showUploadModal && (
         <div
           className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50"
-          onClick={uploadStep === 'done' || uploadStep === 'idle' || uploadStep === 'error' ? resetUploadModal : undefined}
+          onClick={() => resetUploadModal()}
         >
           <div
             className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden ${darkMode ? 'bg-gray-800' : 'bg-white'}`}
@@ -667,9 +722,8 @@ export default function Home() {
                 Upload a Meme
               </h2>
               <button
-                onClick={resetUploadModal}
-                disabled={uploadStep === 'uploading' || uploadStep === 'registering' || uploadStep === 'generating'}
-                className={`p-2 rounded-full transition-colors disabled:opacity-40 ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
+                onClick={() => resetUploadModal()}
+                className={`p-2 rounded-full transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-600'}`}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -683,13 +737,17 @@ export default function Home() {
               {!previewUrl ? (
                 <div
                   className={`border-2 border-dashed rounded-xl flex flex-col items-center justify-center gap-3 p-10 cursor-pointer transition-colors ${
-                    darkMode
+                    isDragOver
+                      ? darkMode ? 'border-purple-400 bg-purple-900/20 text-purple-300' : 'border-purple-500 bg-purple-50 text-purple-600'
+                      : darkMode
                       ? 'border-gray-600 hover:border-purple-500 text-gray-400'
                       : 'border-gray-300 hover:border-purple-400 text-gray-500'
                   }`}
                   onClick={() => fileInputRef.current?.click()}
                   onDrop={handleDrop}
-                  onDragOver={(e) => e.preventDefault()}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(true) }}
+                  onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragOver(false) }}
                 >
                   <svg className="w-12 h-12 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -768,7 +826,7 @@ export default function Home() {
               <div className="flex gap-3">
                 {uploadStep === 'done' ? (
                   <button
-                    onClick={resetUploadModal}
+                    onClick={() => resetUploadModal(true)}
                     className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl transition-colors"
                   >
                     Back to Gallery
@@ -776,9 +834,8 @@ export default function Home() {
                 ) : (
                   <>
                     <button
-                      onClick={resetUploadModal}
-                      disabled={uploadStep === 'uploading' || uploadStep === 'registering' || uploadStep === 'generating'}
-                      className={`flex-1 py-3 rounded-xl font-semibold transition-colors disabled:opacity-40 ${
+                      onClick={() => resetUploadModal()}
+                      className={`flex-1 py-3 rounded-xl font-semibold transition-colors ${
                         darkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
                       }`}
                     >

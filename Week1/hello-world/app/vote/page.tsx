@@ -174,16 +174,18 @@ export default function VotePage() {
 
           {/* Nav Tabs */}
           <div className={`flex gap-1 rounded-xl p-1 ${darkMode ? 'bg-gray-800' : 'bg-gray-200'}`}>
-            <Link href="/" className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${
+            <Link href="/" className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
               darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-            }`}>
-              Meme Gallery
-            </Link>
-            <span className={`px-5 py-2 rounded-lg text-sm font-semibold ${
+            }`}>Gallery</Link>
+            <Link href="/trending" className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}>Trending</Link>
+            <span className={`px-4 py-2 rounded-lg text-sm font-semibold ${
               darkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-900 shadow'
-            }`}>
-              Vote
-            </span>
+            }`}>Vote</span>
+            <Link href="/profile" className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}>Profile</Link>
           </div>
 
           <div className="flex gap-2">
@@ -277,7 +279,7 @@ export default function VotePage() {
                 )}
 
                 {/* Image */}
-                <div className="w-full bg-black flex items-center justify-center" style={{ minHeight: '320px', maxHeight: '460px' }}>
+                <div className={`w-full flex items-center justify-center ${darkMode ? 'bg-gray-900' : 'bg-gray-100'}`} style={{ minHeight: '320px', maxHeight: '460px' }}>
                   <img
                     src={current.imageUrl}
                     alt="Meme"
@@ -288,6 +290,9 @@ export default function VotePage() {
 
                 {/* Single caption */}
                 <div className="px-6 py-5">
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    Rate this caption:
+                  </p>
                   <div className={`p-4 rounded-xl text-base text-center font-medium ${
                     darkMode ? 'bg-gray-700 text-gray-100' : 'bg-gray-100 text-gray-800'
                   }`}>
@@ -296,28 +301,40 @@ export default function VotePage() {
                 </div>
 
                 {/* Vote buttons */}
-                <div className="flex justify-center gap-12 pb-6">
-                  <button
-                    onClick={() => advance('left')}
-                    disabled={!!swipeDir}
-                    className="w-16 h-16 rounded-full bg-gray-700 hover:bg-red-600 flex items-center justify-center text-2xl shadow-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
-                    title="Skip (← arrow key)"
-                  >
-                    ✕
-                  </button>
-                  <button
-                    onClick={() => advance('right')}
-                    disabled={!!swipeDir}
-                    className="w-16 h-16 rounded-full bg-green-600 hover:bg-green-500 flex items-center justify-center text-2xl shadow-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
-                    title="Like (→ arrow key)"
-                  >
-                    ♥
-                  </button>
+                <div className="flex justify-center gap-12 pb-4">
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => advance('left')}
+                      disabled={!!swipeDir}
+                      className="w-16 h-16 rounded-full bg-gray-700 hover:bg-red-600 flex items-center justify-center text-2xl shadow-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                      title="Skip (← arrow key)"
+                    >
+                      ✕
+                    </button>
+                    <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Skip</span>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => advance('right')}
+                      disabled={!!swipeDir}
+                      className="w-16 h-16 rounded-full bg-green-600 hover:bg-green-500 flex items-center justify-center text-2xl shadow-lg transition-all hover:scale-110 active:scale-95 disabled:opacity-50"
+                      title="Like (→ arrow key)"
+                    >
+                      ♥
+                    </button>
+                    <span className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>Like</span>
+                  </div>
                 </div>
 
-                <p className={`text-center text-xs pb-4 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`}>
-                  ← skip &nbsp;·&nbsp; → like
-                </p>
+                {/* Keyboard shortcut hint — prominent */}
+                <div className={`mx-6 mb-5 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm ${darkMode ? 'bg-gray-700/60 text-gray-300' : 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`font-mono px-1.5 py-0.5 rounded text-xs border ${darkMode ? 'border-gray-500 bg-gray-600' : 'border-gray-300 bg-white'}`}>←</span>
+                  <span>Skip</span>
+                  <span className="mx-1 opacity-40">·</span>
+                  <span className={`font-mono px-1.5 py-0.5 rounded text-xs border ${darkMode ? 'border-gray-500 bg-gray-600' : 'border-gray-300 bg-white'}`}>→</span>
+                  <span>Like</span>
+                  <span className="ml-2 opacity-60 text-xs">— keyboard shortcuts</span>
+                </div>
               </div>
             )}
           </>

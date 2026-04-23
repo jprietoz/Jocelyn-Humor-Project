@@ -17,6 +17,7 @@ export async function POST(request: Request) {
 
   const { action, payload } = await request.json()
 
+
   const authHeaders = {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
