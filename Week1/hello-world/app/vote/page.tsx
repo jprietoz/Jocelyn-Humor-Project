@@ -177,9 +177,6 @@ export default function VotePage() {
             <Link href="/" className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
               darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
             }`}>Gallery</Link>
-            <Link href="/trending" className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-              darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
-            }`}>Trending</Link>
             <span className={`px-4 py-2 rounded-lg text-sm font-semibold ${
               darkMode ? 'bg-gray-600 text-white' : 'bg-white text-gray-900 shadow'
             }`}>Vote</span>
