@@ -348,7 +348,8 @@ export default function Home() {
 
       // Step 4: Generate captions
       setUploadStep('generating')
-      const captionData = await callPipeline('generate-captions', { imageId })
+      //below also changed
+      const captionData = await callPipeline('generate-captions', { imageId, humorFlavorId: 35})
 
       // captionData is an array of caption records
       const captions = Array.isArray(captionData)
